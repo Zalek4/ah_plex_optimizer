@@ -1,5 +1,11 @@
 import os
 from pymediainfo import MediaInfo
+from pyfiglet import Figlet
+
+class AH_ASCII:
+    def print_intro_consol_blurb(text):
+        font = Figlet(font="slant")
+        print(font.renderText(f"{text}"))
 
 class AH_FILES:
     def get_unoptimized_videos():
@@ -36,3 +42,7 @@ file_path = "P:\Movies\Airplane! (1980)\Airplane! (1980).1080.HDR.mkv"
 bitrate = AH_VIDEO.get_video_bitrate_mediainfo(file_path=file_path)
 mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate_bps=bitrate)
 print(f"Bitrate: {mbps} Mbps")
+
+if __name__ == "__main__":
+    AH_ASCII.print_intro_consol_blurb(text="PLEX OPTIMIZER")
+    print()
