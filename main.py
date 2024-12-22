@@ -1,7 +1,8 @@
-import os
+import os, sys
 from pymediainfo import MediaInfo
 from pyfiglet import Figlet
 import zazzle
+from tqdm import tqdm
 
 # Initialize logging
 zazzle.ZZ_Init.configure_logger(file_name="plex_optimizer", directory="C:/ah/github/ah_plex_optimizer")
@@ -16,13 +17,18 @@ class AH_FILES:
     def get_unoptimized_videos():
         pass
 
+    def rename_files(old_name, new_name):
+        log(1, f"Renaming:")
+        log(0, f"{old_name} >>> {new_name}")
+        os.rename(old_name, new_name)
+
     def get_unlabeled_videos(video_list):
         log(1, f"Getting unlabeled videos...")
         videos_not_labeled = []
         for video in video_list:
             end_of_file = video[-13:]
             if "Mbps" in end_of_file:
-                log(1, f"Namespace already in: {video}")
+                log(0, f"Namespace already in: {video}")
             else:
                 videos_not_labeled.append(video)
 
@@ -38,6 +44,14 @@ class AH_FILES:
         bitrate = AH_VIDEO.get_video_bitrate_mediainfo(file_path)
         mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate_bps=bitrate)
         log(0, f"Bitrate: {mbps}")
+
+        extension = file_path[-4:]
+        new_front = file_path.replace(extension, "")
+        mbps = str(mbps).replace(".", ",")
+        mbps = f".{mbps}Mbps"
+        new_name = f"{new_front}{mbps}{extension}"
+
+        AH_FILES.rename_files(file_path, new_name)
 
     def get_files_in_directory(directory):
         log(1, f"Getting all folders in directory: {directory}...")
@@ -96,8 +110,7 @@ if __name__ == "__main__":
     print()
 
     # Set library file paths
-    movie_library_path = "P:\Movies Test"
-    tvshow_library_path = "P:\TV Shows"
+    movie_library_path = input(f"Folder to run on: ")
 
     # Ask the user what to do
     print(f"What would you like to do?")
@@ -124,13 +137,9 @@ if __name__ == "__main__":
             unlabeled_videos = AH_FILES.get_unlabeled_videos(movies)
 
             # If there are unlabeled videos, add their bitrate to their name
-            if unlabeled_videos != None:
-                for video in unlabeled_videos:
+            if unlabeled_videos:
+                for video in tqdm(unlabeled_videos, desc="Renaming files", unit="file", dynamic_ncols=True, leave=True, file=sys.stdout):
                     AH_FILES.add_bitrate_to_namespace(video)
-
-            # bitrate = AH_VIDEO.get_video_bitrate_mediainfo(file_path=file_path)
-            # mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate_bps=bitrate)
-            # print(f"Bitrate: {mbps} Mbps")
 
             # Exit loop
             break
