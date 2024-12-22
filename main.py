@@ -3,6 +3,8 @@ from pymediainfo import MediaInfo
 from pyfiglet import Figlet
 import zazzle
 from tqdm import tqdm
+import subprocess
+import json
 
 # Initialize logging
 zazzle.ZZ_Init.configure_logger(file_name="plex_optimizer", directory="C:/ah/github/ah_plex_optimizer")
@@ -26,6 +28,11 @@ class AH_FILES:
         log(1, f"Getting unlabeled videos...")
         videos_not_labeled = []
         for video in video_list:
+            # fix any borked names
+            if "NoneMbps" in video:
+                AH_FILES.rename_files(video, video.replace("NoneMbps.", ""))
+
+            # Find the videos already named
             end_of_file = video[-13:]
             if "Mbps" in end_of_file:
                 log(0, f"Namespace already in: {video}")
@@ -41,7 +48,7 @@ class AH_FILES:
         log(1, f"Adding namespace to {file_path}")
 
         log(0, f"Getting bitrate...")
-        bitrate = AH_VIDEO.get_video_bitrate_mediainfo(file_path)
+        bitrate = AH_VIDEO.get_video_bitrate_ffmpeg(file_path)
         mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate_bps=bitrate)
         log(0, f"Bitrate: {mbps}")
 
@@ -86,13 +93,20 @@ class AH_FILES:
         pass
 
 class AH_VIDEO:
-    def get_video_bitrate_mediainfo(file_path):
+    def get_video_bitrate_ffmpeg(file_path):
         try:
-            media_info = MediaInfo.parse(file_path)
-            for track in media_info.tracks:
-                if track.track_type == "Video" and track.bit_rate:
-                    return int(track.bit_rate)
-            return None
+            # Run ffprobe to get metadata as JSON
+            result = subprocess.run(
+                ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
+                 'format=bit_rate', '-of', 'json', file_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            # Parse the JSON output
+            metadata = json.loads(result.stdout)
+            return int(metadata['format']['bit_rate']) if 'format' in metadata and 'bit_rate' in metadata[
+                'format'] else None
         except Exception as e:
             print(f"Error: {e}")
             return None
