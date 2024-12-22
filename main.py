@@ -4,7 +4,7 @@ from pyfiglet import Figlet
 import zazzle
 
 # Initialize logging
-zazzle.ZZ_Init.configure_logger()
+zazzle.ZZ_Init.configure_logger(file_name="plex_optimizer", directory="C:/ah/github/ah_plex_optimizer")
 log = zazzle.ZZ_Logging.log
 
 class AH_ASCII:
@@ -16,11 +16,52 @@ class AH_FILES:
     def get_unoptimized_videos():
         pass
 
+    def get_unlabeled_videos(video_list):
+        log(1, f"Getting unlabeled videos...")
+        videos_not_labeled = []
+        for video in video_list:
+            end_of_file = video[-13:]
+            if "Mbps" in end_of_file:
+                log(1, f"Namespace already in: {video}")
+            else:
+                videos_not_labeled.append(video)
+
+        for video in videos_not_labeled:
+            log(0, f"{video}")
+
+        return(videos_not_labeled)
+
     def add_bitrate_to_namespace():
         pass
 
-    def list_files_in_directory():
-        pass
+    def get_files_in_directory(directory):
+        log(1, f"Getting all folders in directory: {directory}...")
+        file_names = os.listdir(directory)
+
+        file_paths = []
+        if file_names != None:
+            for name in file_names:
+                file_paths.append(os.path.join(directory, name))
+
+        for path in file_paths:
+            log(0, f"{path}")
+
+        return file_paths
+
+    def find_video_files_in_directory(directory):
+        log(1, f"Getting all video files in directory: {directory}")
+        video_paths = []
+        files = os.listdir(directory)
+        for file in files:
+            full_path = os.path.join(directory, file)
+            if os.path.isfile(full_path):
+                if full_path.endswith(".mp4") or full_path.endswith(".mkv"):
+                    video_paths.append(os.path.join(directory, file))
+
+        for path in video_paths:
+            log(0, path)
+
+        return video_paths
 
     def rename_file():
         pass
@@ -49,8 +90,54 @@ if __name__ == "__main__":
     AH_ASCII.print_intro_consol_blurb(text="THE PLEX OPTIMIZER", font="doom")
     print()
 
-    # Example usage
-    file_path = "P:\Movies\Airplane! (1980)\Airplane! (1980).1080.HDR.mkv"
-    bitrate = AH_VIDEO.get_video_bitrate_mediainfo(file_path=file_path)
-    mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate_bps=bitrate)
-    print(f"Bitrate: {mbps} Mbps")
+    # Set library file paths
+    movie_library_path = "P:\Movies Test"
+    tvshow_library_path = "P:\TV Shows"
+
+    # Ask the user what to do
+    print(f"What would you like to do?")
+    move_on = False
+
+    while move_on == False:
+        print(f"1 - Label media with bitrates")
+        print(f"2 - Optimize media with low bitrate 1080p versions")
+
+        choice = input()
+
+        # Label all video media with it's bitrate
+        if choice == "1":
+            movies_folder_files = AH_FILES.get_files_in_directory(movie_library_path)
+
+            # Get all the actual movie files
+            movies = []
+            for movie in movies_folder_files:
+                video_files = AH_FILES.find_video_files_in_directory(movie)
+                for video in video_files:
+                    movies.append(video)
+
+            # Find all the unlabeled videos in the library
+            unlabeled_videos = AH_FILES.get_unlabeled_videos(movies)
+
+            # If there are unlabeled videos, add their bitrate to their name
+            if unlabeled_videos != None:
+                pass
+
+            # bitrate = AH_VIDEO.get_video_bitrate_mediainfo(file_path=file_path)
+            # mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate_bps=bitrate)
+            # print(f"Bitrate: {mbps} Mbps")
+
+            # Exit loop
+            break
+
+        elif choice == "2":
+            pass
+        else:
+            print("Please enter a valid number")
+
+    # Find full file paths of all videos in the library
+    # Walk through the "Movies" folder
+    # If we find a video file, make sure it's labeled with it's bitrate
+    # For each folder, figure out if we've optimized the files already
+    # Return a list of file paths
+    # Walk through the "TV Shows" folder
+    # Return
