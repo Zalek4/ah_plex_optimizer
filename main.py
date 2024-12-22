@@ -1,11 +1,16 @@
 import os
 from pymediainfo import MediaInfo
 from pyfiglet import Figlet
+import zazzle
+
+# Initialize logging
+zazzle.ZZ_Init.configure_logger()
+log = zazzle.ZZ_Logging.log
 
 class AH_ASCII:
-    def print_intro_consol_blurb(text):
-        font = Figlet(font="slant")
-        print(font.renderText(f"{text}"))
+    def print_intro_consol_blurb(text, font):
+        font = Figlet(font=f"{font}")
+        log(1, font.renderText(f"{text}"), flag=False)
 
 class AH_FILES:
     def get_unoptimized_videos():
@@ -35,14 +40,17 @@ class AH_VIDEO:
     def convert_bitrate_to_mbps(bitrate_bps):
         if bitrate_bps is None:
             return None
-        return bitrate_bps / 1_000_000  # Divide by 1,000,000 to get Mbps
-
-# Example usage
-file_path = "P:\Movies\Airplane! (1980)\Airplane! (1980).1080.HDR.mkv"
-bitrate = AH_VIDEO.get_video_bitrate_mediainfo(file_path=file_path)
-mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate_bps=bitrate)
-print(f"Bitrate: {mbps} Mbps")
+        # Divide by 1,000,000 to get Mbps
+        return round(bitrate_bps / 1_000_000, 2)
 
 if __name__ == "__main__":
-    AH_ASCII.print_intro_consol_blurb(text="PLEX OPTIMIZER")
+
+    # Console blurb because size does indeed matter
+    AH_ASCII.print_intro_consol_blurb(text="THE PLEX OPTIMIZER", font="doom")
     print()
+
+    # Example usage
+    file_path = "P:\Movies\Airplane! (1980)\Airplane! (1980).1080.HDR.mkv"
+    bitrate = AH_VIDEO.get_video_bitrate_mediainfo(file_path=file_path)
+    mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate_bps=bitrate)
+    print(f"Bitrate: {mbps} Mbps")
