@@ -31,8 +31,13 @@ class AH_FILES:
 
         return(videos_not_labeled)
 
-    def add_bitrate_to_namespace():
-        pass
+    def add_bitrate_to_namespace(file_path):
+        log(1, f"Adding namespace to {file_path}")
+
+        log(0, f"Getting bitrate...")
+        bitrate = AH_VIDEO.get_video_bitrate_mediainfo(file_path)
+        mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate_bps=bitrate)
+        log(0, f"Bitrate: {mbps}")
 
     def get_files_in_directory(directory):
         log(1, f"Getting all folders in directory: {directory}...")
@@ -86,7 +91,7 @@ class AH_VIDEO:
 
 if __name__ == "__main__":
 
-    # Console blurb because size does indeed matter
+    # Console blurb because go big or go home amirite
     AH_ASCII.print_intro_consol_blurb(text="THE PLEX OPTIMIZER", font="doom")
     print()
 
@@ -120,7 +125,8 @@ if __name__ == "__main__":
 
             # If there are unlabeled videos, add their bitrate to their name
             if unlabeled_videos != None:
-                pass
+                for video in unlabeled_videos:
+                    AH_FILES.add_bitrate_to_namespace(video)
 
             # bitrate = AH_VIDEO.get_video_bitrate_mediainfo(file_path=file_path)
             # mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate_bps=bitrate)
