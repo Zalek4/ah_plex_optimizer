@@ -74,6 +74,17 @@ class AH_FILES:
 
         return file_paths
 
+    def get_all_files_recursively(directory):
+        all_files = []
+        for entry in os.listdir(directory):
+            full_path = os.path.join(directory, entry)
+            if os.path.isdir(full_path):
+                # Recur for subdirectories
+                all_files.extend(AH_FILES.get_all_files_recursively(full_path))
+            elif os.path.isfile(full_path):
+                all_files.append(full_path)
+        return all_files
+
     def find_video_files_in_directory(directory):
         log(1, f"Getting all video files in directory: {directory}")
         video_paths = []
@@ -138,17 +149,25 @@ if __name__ == "__main__":
 
         # Label all video media with it's bitrate
         if choice == "1":
-            movies_folder_files = AH_FILES.get_files_in_directory(movie_library_path)
+            """movies_folder_files = AH_FILES.get_files_in_directory(movie_library_path)
 
             # Get all the actual movie files
             movies = []
             for movie in movies_folder_files:
                 video_files = AH_FILES.find_video_files_in_directory(movie)
                 for video in video_files:
-                    movies.append(video)
+                    movies.append(video)"""
+
+            all_videos = []
+            all_files = AH_FILES.get_all_files_recursively(movie_library_path)
+
+            for file in all_files:
+                if os.path.isfile(file):
+                    if file.endswith(".mkv") or file.endswith(".mp4"):
+                        all_videos.append(file)
 
             # Find all the unlabeled videos in the library
-            unlabeled_videos = AH_FILES.get_unlabeled_videos(movies)
+            unlabeled_videos = AH_FILES.get_unlabeled_videos(all_videos)
 
             # If there are unlabeled videos, add their bitrate to their name
             if unlabeled_videos:
@@ -162,11 +181,3 @@ if __name__ == "__main__":
             pass
         else:
             print("Please enter a valid number")
-
-    # Find full file paths of all videos in the library
-    # Walk through the "Movies" folder
-    # If we find a video file, make sure it's labeled with it's bitrate
-    # For each folder, figure out if we've optimized the files already
-    # Return a list of file paths
-    # Walk through the "TV Shows" folder
-    # Return
