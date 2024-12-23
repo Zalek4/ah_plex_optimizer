@@ -100,9 +100,6 @@ class AH_FILES:
 
         return video_paths
 
-    def rename_file():
-        pass
-
 class AH_VIDEO:
     def get_video_bitrate_ffmpeg(file_path):
         try:
@@ -128,6 +125,61 @@ class AH_VIDEO:
         # Divide by 1,000,000 to get Mbps
         return round(bitrate_bps / 1_000_000, 2)
 
+    def create_optimized_video_sdr_to_sdr(input_file, target_bitrate, bitrate_buffer):
+        try:
+            # ffmpeg command to convert MKV to MP4 with target bitrate
+            command = [
+                'ffmpeg',
+                '-i', input_file,  # Input file
+                '-b:v', f"{target_bitrate}M",  # Set video bitrate
+                '-maxrate', f"{target_bitrate}M",
+                '-bufsize', f"1M",
+                '-b:a', '128k',  # Set audio bitrate (optional)
+                '-c:v', 'libx265',  # Video codec (H.264)
+                '-c:a', 'aac',  # Audio codec
+                '-movflags', '+faststart',  # Optimize for progressive streaming
+                '-resize', '1920x1080',
+                f"{input_file.replace('.mkv', '')}.optimized.mp4"  # Output file
+            ]
+
+            # Run the ffmpeg command
+            subprocess.run(command, check=True)
+            print(f"Conversion completed")
+        except subprocess.CalledProcessError as e:
+            print(f"Error during conversion: {e}")
+        except FileNotFoundError:
+            print("Error: ffmpeg is not installed or not in PATH.")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+
+    def create_optimized_video_hdr_to_sdr(input_file, target_bitrate, bitrate_buffer):
+        try:
+            # ffmpeg command to convert MKV to MP4 with target bitrate
+            command = [
+                'ffmpeg',
+                '-i', input_file,  # Input file
+                '-b:v', f"{target_bitrate}M",  # Set video bitrate
+                '-maxrate', f"{target_bitrate}M",
+                '-bufsize', f"1M",
+                '-b:a', '128k',  # Set audio bitrate (optional)
+                '-c:v', 'libx265',  # Video codec (H.264)
+                '-c:a', 'aac',  # Audio codec
+                '-movflags', '+faststart',  # Optimize for progressive streaming
+                '-resize', '1920x1080',
+                '-vf', 'zscale=t=linear:npl=100', 'format=gbrpf32le', 'zscale=p=bt709', 'tonemap=tonemap=hable:desat=0', 'zscale=t=bt709:m=bt709:r=tv', 'format=yuv420p', # Convert HDR to SDR
+                f"{input_file.replace('.mkv', '')}.optimized.mp4"  # Output file
+            ]
+
+            # Run the ffmpeg command
+            subprocess.run(command, check=True)
+            print(f"Conversion completed")
+        except subprocess.CalledProcessError as e:
+            print(f"Error during conversion: {e}")
+        except FileNotFoundError:
+            print("Error: ffmpeg is not installed or not in PATH.")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+
 if __name__ == "__main__":
 
     # Console blurb because go big or go home amirite
@@ -138,26 +190,22 @@ if __name__ == "__main__":
     movie_library_path = input(f"Folder to run on: ")
 
     # Ask the user what to do
+    print("")
     print(f"What would you like to do?")
     move_on = False
 
     while move_on == False:
-        print(f"1 - Label media with bitrates")
+        print("")
+        print(f"1 - Label media with bitrates in file names")
         print(f"2 - Optimize media with low bitrate 1080p versions")
+        print(f"3 - Exit")
 
         choice = input()
 
         # Label all video media with it's bitrate
         if choice == "1":
-            """movies_folder_files = AH_FILES.get_files_in_directory(movie_library_path)
 
-            # Get all the actual movie files
-            movies = []
-            for movie in movies_folder_files:
-                video_files = AH_FILES.find_video_files_in_directory(movie)
-                for video in video_files:
-                    movies.append(video)"""
-
+            # Get all the files in our given directory
             all_videos = []
             all_files = AH_FILES.get_all_files_recursively(movie_library_path)
 
@@ -174,10 +222,10 @@ if __name__ == "__main__":
                 for video in tqdm(unlabeled_videos, desc="Renaming files", unit="file", dynamic_ncols=True, leave=True, file=sys.stdout):
                     AH_FILES.add_bitrate_to_namespace(video)
 
-            # Exit loop
-            break
-
         elif choice == "2":
-            pass
+            log(1, "WIP")
+        elif choice == "3":
+            log(2, f"Exiting...")
+            break
         else:
             print("Please enter a valid number")
