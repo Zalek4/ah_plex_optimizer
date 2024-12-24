@@ -1,10 +1,11 @@
 import os, sys
-from pymediainfo import MediaInfo
 from pyfiglet import Figlet
 import zazzle
 from tqdm import tqdm
 import subprocess
 import json
+import ffmpeg
+from datetime import datetime
 
 # Initialize logging
 zazzle.ZZ_Init.configure_logger(file_name="plex_optimizer", directory="C:/ah/github/ah_plex_optimizer")
@@ -16,7 +17,118 @@ class AH_ASCII:
         log(1, font.renderText(f"{text}"), flag=False)
 
 class AH_FILES:
-    def get_unoptimized_videos():
+
+    def fix_base_movie_name(full_movie_path):
+        # Get the movie extension
+        movie_extension = full_movie_path[-4:]
+        log(0, f"Extension : {movie_extension}")
+
+        file_name = full_movie_path.rpartition("\\")[-1]
+        log(1, f"Movie : {file_name}")
+
+        # Get the year of the movie from it's file name
+        movie_year = AH_FILES.find_video_year_from_name(file_name)
+        log(0, f"Year : {movie_year}")
+
+        # Get the front of our string
+        name_front = file_name.rpartition(str(movie_year))[0]
+        log(0, f"Name Front : {name_front}")
+
+        # Get the back of our string
+        name_back = file_name.rpartition(str(movie_year))[1]
+        log(0, f"Name Back : {name_back}")
+
+        # Combine the front and back
+        base_name = f"{name_front}{name_back}"
+        log(0, f"Front + Back : {base_name}")
+
+        # Replace any periods with spaces
+        base_name = base_name.replace(".", " ")
+        log(0, f"Replaced '.' : {base_name}")
+
+        # Fix any 'vs' in our title
+        base_name = base_name.replace(" vs ", " vs.")
+        log(0, f"VS fix : {base_name}")
+
+        # Remove and re-add the () to the year
+        base_name = base_name.replace("(", "")
+        base_name = base_name.replace(")", "")
+        base_name = base_name.replace(str(movie_year), f"({str(movie_year)})")
+        log(0, f"Fix () : {base_name}")
+
+        # Add video width and height
+        media_dimensions = AH_PROBE.get_video_dimensions(full_movie_path)
+        log(0, f"Media Dimensions : {media_dimensions}")
+        resolution = media_dimensions[0] / 1.77777
+        resolution = int(resolution)
+        detailed_name = f"{base_name}.{resolution}"
+        log(0, f"Detailed Name : {detailed_name}")
+
+        # Add HDR status
+        dynamic_resolution = AH_VIDEO.video_hdr_check(full_movie_path)
+        if dynamic_resolution == True:
+            detailed_name = f"{detailed_name}.HDR"
+        else:
+            detailed_name = f"{detailed_name}.SDR"
+        log(0, f"Detailed Name : {detailed_name}")
+
+        # Add the bitrate
+        bitrate = AH_VIDEO.get_video_bitrate_ffmpeg(full_movie_path)
+        mbps = AH_VIDEO.convert_bitrate_to_mbps(bitrate)
+        detailed_name = f"{detailed_name}.{str(mbps).replace('.', ',')}Mbps"
+        log(0, f"Detailed Name : {detailed_name}")
+
+        # Add extension back in
+        final_name = f"{detailed_name}{movie_extension}"
+        log(0, f"Add extension : {final_name}")
+
+        return base_name, detailed_name, final_name
+
+    def fix_base_show_name():
+        pass
+
+    def add_media_data_to_filename(full_file_path):
+
+        # Get video HDR status
+        HDR = AH_VIDEO.video_hdr_check(full_file_path)
+
+        # Get bitrate
+        bitrate = AH_VIDEO.get_video_bitrate_ffmpeg(full_file_path)
+
+    def get_video_bitrate_from_file_name(video_path):
+        log(1, f"Getting bitrate for : {video_path}")
+
+        # Split the string until we're left with the Mbps, and then convert it to a float
+        left_string = video_path.rpartition("Mbps")[0]
+        mbps = left_string.rpartition(".")[-1]
+        mbps = mbps.replace(",", ".")
+        mbps = float(mbps)
+
+        log(0, f"Bitrate : {mbps}Mbps")
+
+    # Get a list of years from the first movie ever released to the current year
+    def create_list_of_years():
+        current_year = datetime.now().year
+        years_list = []
+
+        for i in range(1888, current_year):
+            years_list.append(i)
+
+        return years_list
+
+    def find_video_year_from_name(video_name):
+        years = AH_FILES.create_list_of_years()
+
+        # Find the year as long as it doesn't equal 1080 or 2160
+        for i in years:
+            if str(i) in video_name:
+                if i != 1080 and i != 2160:
+                    year = i
+                    break
+
+        return year
+
+    def fix_downloaded_names(download_directory):
         pass
 
     def rename_files(old_name, new_name):
@@ -100,6 +212,36 @@ class AH_FILES:
 
         return video_paths
 
+class AH_PROBE:
+
+    def get_video_dimensions(file_path):
+        try:
+            log(1, f"Getting resolution for {file_path}")
+            # Run ffprobe to get width and height
+            result = subprocess.run(
+                [
+                    "ffprobe", "-v", "error", "-select_streams", "v:0",
+                    "-show_entries", "stream=width,height",
+                    "-of", "json", file_path
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+
+            # Parse the JSON output
+            metadata = json.loads(result.stdout)
+            streams = metadata.get("streams", [])
+            if streams:
+                width = streams[0].get("width")
+                height = streams[0].get("height")
+                log(0, f"{width}x{height}")
+                return width, height
+            return None
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
+
 class AH_VIDEO:
     def get_video_bitrate_ffmpeg(file_path):
         try:
@@ -119,6 +261,44 @@ class AH_VIDEO:
             print(f"Error: {e}")
             return None
 
+    def video_hdr_check(file_path):
+        try:
+            # Run ffprobe to extract color metadata
+            result = subprocess.run(
+                [
+                    "ffprobe", "-v", "error", "-select_streams", "v:0",
+                    "-show_entries", "stream=color_primaries,transfer_characteristics,matrix_coefficients",
+                    "-of", "json", file_path
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+
+            # Parse the JSON output
+            metadata = json.loads(result.stdout)
+            streams = metadata.get("streams", [])
+
+            if not streams:
+                return False
+
+            # Check color metadata
+            video_stream = streams[0]
+            color_primaries = video_stream.get("color_primaries", "")
+            transfer_characteristics = video_stream.get("transfer_characteristics", "")
+            matrix_coefficients = video_stream.get("matrix_coefficients", "")
+
+            # Identify HDR characteristics
+            if transfer_characteristics in ["smpte2084", "arib-std-b67"]:  # PQ or HLG
+                return True
+            elif color_primaries == "bt2020":
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(f"Error: {e}")
+            return False
+
     def convert_bitrate_to_mbps(bitrate_bps):
         if bitrate_bps is None:
             return None
@@ -126,59 +306,38 @@ class AH_VIDEO:
         return round(bitrate_bps / 1_000_000, 2)
 
     def create_optimized_video_sdr_to_sdr(input_file, target_bitrate, bitrate_buffer):
-        try:
-            # ffmpeg command to convert MKV to MP4 with target bitrate
-            command = [
-                'ffmpeg',
-                '-i', input_file,  # Input file
-                '-b:v', f"{target_bitrate}M",  # Set video bitrate
-                '-maxrate', f"{target_bitrate}M",
-                '-bufsize', f"1M",
-                '-b:a', '128k',  # Set audio bitrate (optional)
-                '-c:v', 'libx265',  # Video codec (H.264)
-                '-c:a', 'aac',  # Audio codec
-                '-movflags', '+faststart',  # Optimize for progressive streaming
-                '-resize', '1920x1080',
-                f"{input_file.replace('.mkv', '')}.optimized.mp4"  # Output file
-            ]
+        log(1, f"Converting SDR video to SDR video...")
+        log(0, f"Input file: {input_file}")
 
-            # Run the ffmpeg command
-            subprocess.run(command, check=True)
-            print(f"Conversion completed")
-        except subprocess.CalledProcessError as e:
-            print(f"Error during conversion: {e}")
-        except FileNotFoundError:
-            print("Error: ffmpeg is not installed or not in PATH.")
-        except Exception as e:
-            print(f"Unexpected error: {e}")
+        # ffmpeg command to convert MKV to MP4 with target bitrate
+        ffmpeg.input(f'{input_file}') \
+            .video.filter('scale', '-2', '720') \
+            .output(f'{input_file.replace(".mkv", "")}.optimized.mp4', vcodec='libx265', preset='superfast', acodec='copy', **{'b:v': f'{target_bitrate}M', 'maxrate': target_bitrate, 'bufsize': f'{bitrate_buffer}M'}) \
+            .run(overwrite_output=True)
 
     def create_optimized_video_hdr_to_sdr(input_file, target_bitrate, bitrate_buffer):
-        try:
-            # ffmpeg command to convert MKV to MP4 with target bitrate
-            command = [
-                'ffmpeg',
-                '-i', input_file,  # Input file
-                '-b:v', f"{target_bitrate}M",  # Set video bitrate
-                '-maxrate', f"{target_bitrate}M",
-                '-bufsize', f"1M",
-                '-b:a', '128k',  # Set audio bitrate (optional)
-                '-c:v', 'libx265',  # Video codec (H.264)
-                '-c:a', 'aac',  # Audio codec
-                '-movflags', '+faststart',  # Optimize for progressive streaming
-                '-resize', '1920x1080',
-                '-vf', 'zscale=t=linear:npl=100', 'format=gbrpf32le', 'zscale=p=bt709', 'tonemap=tonemap=hable:desat=0', 'zscale=t=bt709:m=bt709:r=tv', 'format=yuv420p', # Convert HDR to SDR
-                f"{input_file.replace('.mkv', '')}.optimized.mp4"  # Output file
-            ]
+        log(1, f"Converting HDR video to SDR video...")
+        log(0, f"Input file: {input_file}")
 
-            # Run the ffmpeg command
-            subprocess.run(command, check=True)
-            print(f"Conversion completed")
-        except subprocess.CalledProcessError as e:
-            print(f"Error during conversion: {e}")
-        except FileNotFoundError:
-            print("Error: ffmpeg is not installed or not in PATH.")
-        except Exception as e:
-            print(f"Unexpected error: {e}")
+        # ffmpeg command to convert MKV to MP4 with target bitrate
+        try:
+            log(0, f"Attempting to convert HDR video using 'bt709' colorspace...")
+            ffmpeg.input(f'{input_file}') \
+                .video.filter('zscale', t='linear', npl=100) \
+                .filter('scale', '-2', '720') \
+                .filter('format', pix_fmts='gbrpf32le') \
+                .filter('tonemap', tonemap='hable', desat=0) \
+                .filter('zscale', p='bt709', t='bt709', m='bt709', r='tv') \
+                .filter('format', pix_fmts='yuv420p') \
+                .output(f'{input_file.replace(".mkv", "")}.optimized.mp4', vcodec='libx265', preset='superfast', scodec='copy', acodec='aac', audio_bitrate='128k', **{'b:v': f'{target_bitrate}M', 'maxrate': target_bitrate, 'bufsize': f'{bitrate_buffer}M'}) \
+                .run(overwrite_output=True)
+
+            # libx265
+            # tune='fastdecode'
+        except:
+            log(3, f"Unable to convert HDR video to SDR video")
+            log(2, f"Converting using SDR to SDR...")
+            AH_VIDEO.create_optimized_video_sdr_to_sdr(input_file=input_file, target_bitrate=target_bitrate, bitrate_buffer=bitrate_buffer)
 
 if __name__ == "__main__":
 
@@ -187,7 +346,7 @@ if __name__ == "__main__":
     print()
 
     # Set library file paths
-    movie_library_path = input(f"Folder to run on: ")
+    input_library_path = input(f"Folder to run on: ")
 
     # Ask the user what to do
     print("")
@@ -198,16 +357,17 @@ if __name__ == "__main__":
         print("")
         print(f"1 - Label media with bitrates in file names")
         print(f"2 - Optimize media with low bitrate 1080p versions")
-        print(f"3 - Exit")
+        print(f"3 - Unify names")
+        print(f"4 - Exit")
 
         choice = input()
 
         # Label all video media with it's bitrate
         if choice == "1":
 
-            # Get all the files in our given directory
+            # Get all the video files in our given directory
             all_videos = []
-            all_files = AH_FILES.get_all_files_recursively(movie_library_path)
+            all_files = AH_FILES.get_all_files_recursively(input_library_path)
 
             for file in all_files:
                 if os.path.isfile(file):
@@ -222,9 +382,55 @@ if __name__ == "__main__":
                 for video in tqdm(unlabeled_videos, desc="Renaming files", unit="file", dynamic_ncols=True, leave=True, file=sys.stdout):
                     AH_FILES.add_bitrate_to_namespace(video)
 
+        # Create optimized 720p versions of all videos in the specified directory
         elif choice == "2":
-            log(1, "WIP")
-        elif choice == "3":
+            movies_folder_files = AH_FILES.get_files_in_directory(input_library_path)
+
+            # Get all the actual movie files
+            for movie in movies_folder_files:
+                video_files = AH_FILES.find_video_files_in_directory(movie)
+
+                optimized = False
+
+                for video in video_files:
+                    if "optimized" in str(video):
+                        optimized = True
+                        break
+
+                if optimized == False:
+                    # Get the first video index
+                    video = video_files[0]
+
+                    # Figure out if this video is SDR or HDR
+                    hdr_check = AH_VIDEO.video_hdr_check(video)
+
+                    # Convert to the appropriate new video
+
+                    if hdr_check:
+                        AH_VIDEO.create_optimized_video_hdr_to_sdr(input_file=video, target_bitrate=7, bitrate_buffer=1)
+                    else:
+                        AH_VIDEO.create_optimized_video_sdr_to_sdr(input_file=video, target_bitrate=7, bitrate_buffer=1)
+
+        # Create correct video/folder names for newly downloaded content
+        elif choice =="3":
+            movie_folders = AH_FILES.get_files_in_directory(input_library_path)
+
+            # Get all the actual movie files
+            video_files = []
+            for movie_folder in movie_folders:
+                log(1, f"Running scan/rename on {movie_folder}")
+                videos = AH_FILES.find_video_files_in_directory(movie_folder)
+
+                # Rename all the videos in the file we're in
+                for video in videos:
+                    base_name, detailed_name, final_name = AH_FILES.fix_base_movie_name(video)
+                    AH_FILES.rename_files(video, final_name)
+                log(0, f"Folder name : {base_name}")
+
+                # Rename the main folder to match the videos
+                AH_FILES.rename_files(movie_folder, f"{input_library_path}\\{base_name}")
+
+        elif choice == "4":
             log(2, f"Exiting...")
             break
         else:
