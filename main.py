@@ -6,6 +6,7 @@ import subprocess
 import json
 import ffmpeg
 from datetime import datetime
+import shutil
 
 # Initialize logging
 zazzle.ZZ_Init.configure_logger(file_name="plex_optimizer", directory="C:/ah/github/ah_plex_optimizer")
@@ -24,7 +25,9 @@ class AH_FILES:
         log(0, f"Extension : {movie_extension}")
 
         file_name = full_movie_path.rpartition("\\")[-1]
+        folder_name = full_movie_path.rpartition("\\")[0]
         log(1, f"Movie : {file_name}")
+        log(1, f"Folder: {folder_name}")
 
         # Get the year of the movie from it's file name
         movie_year = AH_FILES.find_video_year_from_name(file_name)
@@ -82,6 +85,8 @@ class AH_FILES:
         final_name = f"{detailed_name}{movie_extension}"
         log(0, f"Add extension : {final_name}")
 
+        AH_FILES.rename_files(full_movie_path, f"{folder_name}\\{final_name}")
+
         return base_name, detailed_name, final_name
 
     def fix_base_show_name():
@@ -132,9 +137,25 @@ class AH_FILES:
         pass
 
     def rename_files(old_name, new_name):
-        log(1, f"Renaming:")
-        log(0, f"{old_name} >>> {new_name}")
-        os.rename(old_name, new_name)
+        log(1, f"Renaming : {old_name} >>> {new_name}")
+
+        old_drive, old_path = os.path.splitdrive(old_name)
+        new_drive, new_path = os.path.splitdrive(new_name)
+        log(0, f"Old Drive : {old_drive}")
+        log(0, f"Old Path  : {old_path}")
+        log(0, f"New Drive : {new_drive}")
+        log(0, f"New Path  : {new_path}")
+
+        if old_drive == new_drive:
+            # Same drive: Use os.rename
+            os.rename(old_name, new_name)
+        else:
+            # Different drives: Create new folder, move contents, and delete old folder
+            log(1, f"Cross-drive rename detected.")
+            os.makedirs(new_name, exist_ok=True)  # Create new folder
+            for item in os.listdir(old_name):
+                shutil.move(os.path.join(old_name, item), new_name)  # Move contents
+            os.rmdir(old_name)  # Remove old folder
 
     def get_unlabeled_videos(video_list):
         log(1, f"Getting unlabeled videos...")
@@ -175,6 +196,7 @@ class AH_FILES:
     def get_files_in_directory(directory):
         log(1, f"Getting all folders in directory: {directory}...")
         file_names = os.listdir(directory)
+        log(2, f"{file_names}")
 
         file_paths = []
         if file_names != None:
@@ -357,7 +379,7 @@ if __name__ == "__main__":
         print("")
         print(f"1 - Label media with bitrates in file names")
         print(f"2 - Optimize media with low bitrate 1080p versions")
-        print(f"3 - Unify names")
+        print(f"3 - Auto rename downloaded files")
         print(f"4 - Exit")
 
         choice = input()
@@ -412,23 +434,56 @@ if __name__ == "__main__":
                         AH_VIDEO.create_optimized_video_sdr_to_sdr(input_file=video, target_bitrate=7, bitrate_buffer=1)
 
         # Create correct video/folder names for newly downloaded content
-        elif choice =="3":
+        elif choice == "3":
             movie_folders = AH_FILES.get_files_in_directory(input_library_path)
 
-            # Get all the actual movie files
-            video_files = []
+            # Separate folders and videos in the main input folder
+            main_folder_video_files = [item for item in movie_folders if item.endswith((".mkv", ".mp4"))]
+            movie_folders = [item for item in movie_folders if not item.endswith((".mkv", ".mp4"))]
+
+            log(2, f"{movie_folders}")
+
+            # Make folders for each video, and move the videos to their respective folders
+            if main_folder_video_files:
+                log(1, f"Found {len(main_folder_video_files)} in the main library folder.")
+                for video in main_folder_video_files:
+                    # Rename the file
+                    base_name, detailed_name, final_name = AH_FILES.fix_base_movie_name(video)
+
+                    # Create a properly named folder
+                    target_folder = f"{input_library_path}\\{base_name}"
+                    if not os.path.exists(target_folder):
+                        os.mkdir(target_folder)
+                        log(0, f"Created folder: {target_folder}")
+                    else:
+                        log(1, f"Folder '{target_folder}' already exists.")
+
+                    # Move the renamed file to the folder
+                    source_path = f"{input_library_path}\\{final_name}"  # Use the full path as-is
+                    destination_path = os.path.join(target_folder, final_name)
+                    log(1, f"Source path: {source_path}")
+                    log(1, f"Destination path: {destination_path}")
+
+                    if os.path.exists(destination_path):
+                        log(1, f"File '{destination_path}' already exists. Skipping move.")
+                    elif os.path.exists(source_path):
+                        shutil.move(source_path, destination_path)
+                        log(0, f"Moved {source_path} >>> {destination_path}")
+                    else:
+                        log(3, f"Source file '{source_path}' does not exist.")
+
+            # Rename folders and their contents
             for movie_folder in movie_folders:
                 log(1, f"Running scan/rename on {movie_folder}")
                 videos = AH_FILES.find_video_files_in_directory(movie_folder)
 
-                # Rename all the videos in the file we're in
+                # Rename all the videos in the folder
                 for video in videos:
                     base_name, detailed_name, final_name = AH_FILES.fix_base_movie_name(video)
-                    AH_FILES.rename_files(video, final_name)
-                log(0, f"Folder name : {base_name}")
 
                 # Rename the main folder to match the videos
                 AH_FILES.rename_files(movie_folder, f"{input_library_path}\\{base_name}")
+
 
         elif choice == "4":
             log(2, f"Exiting...")
