@@ -121,6 +121,33 @@ class AH_FILES:
 
         return years_list
 
+    def create_list_of_show_episode_strings():
+        # Possible string combinations
+
+        possible_strings_no_spaces = []
+        possible_strings_periods = []
+        possible_strings_spaces = []
+
+        strings_list = [
+            "E",
+            "EP",
+            "e",
+            "ep",
+            "EPI",
+            "epi",
+            "EPISODE",
+            "episode",
+            "Episode"
+        ]
+
+        numbers_list = []
+        for number in range(9):
+            numbers_list.append(f"{0}{number}")
+
+        for string in strings_list:
+            possible_strings_no_spaces.append(f"{string}{number}")
+
+
     def find_video_year_from_name(video_name):
         years = AH_FILES.create_list_of_years()
 
