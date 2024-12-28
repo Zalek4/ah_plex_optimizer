@@ -5,7 +5,18 @@ from PyQt6.QtWidgets import (QApplication, QVBoxLayout, QFormLayout, QWidget, QP
 class AH_Main_Window(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Dynamic Form Layout Example")
+        self.setWindowTitle("Starboard")
+
+        # Get the screen's available geometry
+        screen = QApplication.primaryScreen()
+        screen_geometry = screen.availableGeometry()
+
+        # Calculate window size (e.g., 50% of screen width and 70% of screen height)
+        width = int(screen_geometry.width() * 0.5)
+        height = int(screen_geometry.height() * 0.7)
+
+        # Set the window size
+        self.resize(width, height)
 
         # Create the layout for the main window
         self.layout = QVBoxLayout()
@@ -36,6 +47,9 @@ class AH_Main_Window(QWidget):
         # Set the layout for the window
         self.setLayout(self.layout)
 
+        # Apply custom styles
+        self.apply_dark_theme()
+
     def generate_form(self):
         # Clear any existing fields from the form
         self.clear_form()
@@ -64,3 +78,61 @@ class AH_Main_Window(QWidget):
             item = self.form_layout.itemAt(i)
             if item.widget():
                 item.widget().deleteLater()
+
+    def apply_dark_theme(self):
+        # Apply a stylesheet for the dark theme
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #121212;
+                color: #ffffff;
+                font-family: Arial;
+                font-size: 14px;
+            }
+            QLabel {
+                color: #e0e0e0;
+                font-weight: bold;
+                padding: 5px;
+            }
+            QLineEdit, QComboBox, QSpinBox {
+                border: 1px solid #333;
+                border-radius: 4px;
+                padding: 5px;
+                background-color: #1e1e1e;
+                color: #ffffff;
+            }
+            QLineEdit:hover, QComboBox:hover, QSpinBox:hover {
+                border: 1px solid #6200ea;
+            }
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
+                border: 1px solid #bb86fc;
+            }
+            QPushButton {
+                background-color: #6200ea;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 10px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #3700b3;
+            }
+            QPushButton:pressed {
+                background-color: #bb86fc;
+            }
+            QCheckBox {
+                padding: 5px;
+                color: #e0e0e0;
+            }
+            QCheckBox::indicator {
+                width: 15px;
+                height: 15px;
+                background-color: #333;
+                border: 1px solid #777;
+                border-radius: 2px;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #6200ea;
+                border: 1px solid #bb86fc;
+            }
+        """)
